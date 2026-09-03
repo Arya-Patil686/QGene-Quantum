@@ -1,0 +1,19 @@
+# Runtime-only dependencies for the served application.
+#
+# The offline pipeline (ml/) additionally needs pyarrow for parquet and
+# matplotlib for figures; neither is imported when serving, so they are kept
+# out of the container image. Install requirements.txt for development.
+
+numpy>=2.0
+pandas>=2.2
+scikit-learn>=1.5
+scipy>=1.13
+joblib>=1.4
+shap>=0.45
+
+qiskit>=2.0
+qiskit-machine-learning>=0.8
+
+flask>=3.0
+flask-cors>=4.0
+gunicorn>=22.0

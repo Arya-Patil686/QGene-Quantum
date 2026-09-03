@@ -20,6 +20,9 @@ setup:
 	$(PIP) install -r requirements.txt
 	cd web && npm install
 
+# requirements.txt covers development and the offline pipeline;
+# requirements-runtime.txt is the smaller set the container installs.
+
 data:
 	mkdir -p data/raw
 	curl -sS "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz" \

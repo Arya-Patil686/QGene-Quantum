@@ -8,6 +8,7 @@ user supplies.
 """
 from __future__ import annotations
 
+import gc
 import sys
 import threading
 import time
@@ -240,10 +241,14 @@ class Platform:
 
         session_id = uuid.uuid4().hex[:12]
         with self._lock:
-            if len(self.sessions) > 12:                    # keep memory bounded
+            # Each session holds a fitted pipeline, so the cap is a memory
+            # budget rather than a convenience: three is enough for a demo and
+            # keeps the process comfortably inside a 512 MB instance.
+            while len(self.sessions) >= 3:
                 self.sessions.pop(next(iter(self.sessions)))
             self.sessions[session_id] = {"pipeline": pipe, "dataset": ds,
                                          "fitted": fitted, "created": time.time()}
+        gc.collect()
 
         record = _jsonable(asdict(fitted))
         record["session"] = session_id

@@ -17,14 +17,15 @@ RUN useradd -m -u 1000 user
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH \
     PORT=7860 \
+    MALLOC_ARENA_MAX=2 \
     MPLCONFIGDIR=/tmp/mpl \
     HF_HOME=/tmp/hf
 
 WORKDIR $HOME/app
 
-COPY --chown=user requirements.txt .
+COPY --chown=user requirements-runtime.txt .
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir -r requirements.txt
+ && pip install --no-cache-dir -r requirements-runtime.txt
 
 COPY --chown=user ml ./ml
 COPY --chown=user backend ./backend

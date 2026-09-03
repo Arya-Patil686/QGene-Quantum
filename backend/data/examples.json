@@ -1,0 +1,42 @@
+[
+  {
+    "name": "NM_007294.4(BRCA1):c.181T>G (p.Cys61Gly)",
+    "label": "BRCA1 C61G",
+    "note": "Founder missense in the RING domain. Abolishes zinc binding; classified pathogenic."
+  },
+  {
+    "name": "NM_007294.4(BRCA1):c.68_69del (p.Glu23fs)",
+    "label": "BRCA1 185delAG",
+    "note": "Ashkenazi founder frameshift near the start of the coding sequence."
+  },
+  {
+    "name": "NM_000059.4(BRCA2):c.5946del (p.Ser1982fs)",
+    "label": "BRCA2 6174delT",
+    "note": "The second Ashkenazi founder variant, a frameshift inside the BRC repeats."
+  },
+  {
+    "name": "NM_007294.4(BRCA1):c.5266dup (p.Gln1756fs)",
+    "label": "BRCA1 5382insC",
+    "note": "Northern European founder duplication, frameshift before the BRCT domains."
+  },
+  {
+    "name": "NM_007294.4(BRCA1):c.5074+2T>C",
+    "label": "BRCA1 splice donor",
+    "note": "Canonical +2 donor-site substitution. No protein change is written, so the call rests on position alone."
+  },
+  {
+    "name": "NM_000059.4(BRCA2):c.9976A>T (p.Lys3326Ter)",
+    "label": "BRCA2 K3326X",
+    "note": "A stop-gained variant that is nonetheless classified benign: it removes only the final 93 residues. A deliberate test of whether the model treats every truncation as damaging."
+  },
+  {
+    "name": "NM_007294.4(BRCA1):c.4837A>G (p.Ser1613Gly)",
+    "label": "BRCA1 S1613G",
+    "note": "Common polymorphism, classified benign."
+  },
+  {
+    "name": "NM_000059.4(BRCA2):c.7397T>C (p.Val2466Ala)",
+    "label": "BRCA2 V2466A",
+    "note": "Frequent benign missense inside the DNA-binding domain."
+  }
+]

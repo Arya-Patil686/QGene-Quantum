@@ -168,9 +168,13 @@ docker build -t qgene . && docker run -p 8000:8000 qgene
 
 | Target | Config | Notes |
 |---|---|---|
-| Render | `render.yaml` | Free tier works; blueprint deploy needs no extra setup |
+| Render | `render.yaml` | Free tier works — [deploy the blueprint](https://render.com/deploy?repo=https://github.com/Arya-Patil686/QGene-Quantum) |
 | Fly.io | `deploy/fly.toml` | `fly launch --copy-config --config deploy/fly.toml` |
-| Hugging Face Space | `deploy/hf/` + `scripts/deploy_hf.sh` | Docker Spaces need a PRO account |
+| Hugging Face Space | `deploy/hf/` + `scripts/deploy_hf.sh` | Docker Spaces require a PRO account |
+
+The image installs `requirements-runtime.txt`, which omits the parquet and
+plotting dependencies the served app never imports. Verified in a container
+capped at 512 MB — the same limit as Render's free tier.
 
 ## Credit
 

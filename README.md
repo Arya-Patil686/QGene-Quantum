@@ -132,6 +132,20 @@ make serve &
 make dev
 ```
 
+## Deployment
+
+The repository ships a two-stage `Dockerfile` — Node builds the front end, and
+the runtime image carries only Python and the built assets:
+
+```bash
+docker build -t qgene .
+docker run -p 8000:8000 qgene
+```
+
+`render.yaml` points at that Dockerfile, so a Render deploy needs no extra
+configuration. The trained bundle is committed, so no build-time training step
+is required.
+
 ## Layout
 
 ```

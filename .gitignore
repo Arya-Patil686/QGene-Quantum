@@ -17,5 +17,11 @@ data/raw/parts/
 # Derived arrays — regenerate with `make data`
 data/processed/
 
+# Bundled dataset archives — the four extracted files the loaders read are
+# committed; re-download with ./scripts/fetch_bundled.sh
+data/bundled/*.zip
+data/bundled/heart/costs/
+data/bundled/parkinsons/telemonitoring/
+
 # OS
 .DS_Store

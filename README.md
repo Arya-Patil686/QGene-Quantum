@@ -159,11 +159,18 @@ node scripts/build_deck.js
 ## Deployment
 
 Two-stage `Dockerfile` — Node builds the front end, the runtime image carries
-only Python and the built assets.
+only Python and the built assets. The process sits at roughly 150 MB resident,
+so a 512 MB instance is enough.
 
 ```bash
 docker build -t qgene . && docker run -p 8000:8000 qgene
 ```
+
+| Target | Config | Notes |
+|---|---|---|
+| Render | `render.yaml` | Free tier works; blueprint deploy needs no extra setup |
+| Fly.io | `deploy/fly.toml` | `fly launch --copy-config --config deploy/fly.toml` |
+| Hugging Face Space | `deploy/hf/` + `scripts/deploy_hf.sh` | Docker Spaces need a PRO account |
 
 ## Credit
 

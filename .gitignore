@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+web/dist/
+
+# Raw ClinVar download — 420 MB archive plus the filtered extract.
+# Regenerate with `./scripts/fetch_clinvar.sh` or `make data`.
+data/raw/*.gz
+data/raw/*.tsv
+data/raw/*.err
+data/raw/parts/
+
+# Derived arrays — regenerate with `make data`
+data/processed/
+
+# OS
+.DS_Store

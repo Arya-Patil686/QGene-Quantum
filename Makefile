@@ -2,7 +2,8 @@
 #
 #   make setup    create the virtualenv and install everything
 #   make data     download ClinVar and build the leak-free dataset
-#   make train    train all four models, calibrate, evaluate
+#   make platform train every bundled dataset through the hybrid pipeline
+#   make train    the genomics deep-dive (leakage demo, stratified evaluation)
 #   make vus      score every unresolved variant
 #   make web      build the front end
 #   make serve    run the API + built front end on :5001
@@ -11,7 +12,7 @@
 PY := .venv/bin/python
 PIP := .venv/bin/pip
 
-.PHONY: setup data train vus web serve all dev clean
+.PHONY: setup data platform train vus report web serve all dev clean
 
 setup:
 	python3 -m venv .venv
@@ -27,11 +28,18 @@ data:
 	  > data/raw/clinvar_brca_raw.tsv
 	$(PY) ml/build_dataset.py
 
+platform:
+	$(PY) ml/train_platform.py
+
 train:
 	$(PY) ml/train.py
 
 vus:
 	$(PY) ml/score_vus.py
+
+report:
+	$(PY) scripts/make_report.py
+	$(PY) scripts/make_platform_report.py
 
 web:
 	cd web && npm run build
@@ -42,7 +50,7 @@ serve:
 dev:
 	cd web && npm run dev
 
-all: data train vus web
+all: data train vus platform report web
 
 clean:
 	rm -rf data/processed backend/models/*.joblib web/dist

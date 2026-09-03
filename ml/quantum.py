@@ -235,3 +235,222 @@ def bloch_coordinates(x: np.ndarray, reps: int = 2) -> list[dict]:
             "purity": float(np.real(np.trace(rho @ rho))),
         })
     return coords
+
+
+# ---------------------------------------------------------------------------
+# Quantum Neural Network (data re-uploading)
+# ---------------------------------------------------------------------------
+
+def _apply_1q(state: np.ndarray, mats: np.ndarray, qubit: int,
+              n_qubits: int) -> np.ndarray:
+    """
+    Apply a per-sample single-qubit gate to a batch of states.
+
+    `state` is (batch, 2^n), `mats` is (batch, 2, 2) or a single (2, 2).
+    Qubit indexing follows Qiskit's little-endian convention, the same one
+    `zz_statevectors` uses.
+
+    The amplitudes are viewed as (batch, left, 2, right) so the target qubit
+    is already an axis — no transpose or copy is needed, which matters because
+    the optimiser calls this tens of thousands of times.
+    """
+    batch = state.shape[0]
+    right = 1 << qubit
+    left = 1 << (n_qubits - qubit - 1)
+    s = state.reshape(batch, left, 2, right)
+    a = s[:, :, 0, :]
+    b = s[:, :, 1, :]
+    if mats.ndim == 2:
+        m00, m01, m10, m11 = mats[0, 0], mats[0, 1], mats[1, 0], mats[1, 1]
+    else:
+        # broadcast the per-sample entries over (left, right)
+        m00 = mats[:, 0, 0][:, None, None]
+        m01 = mats[:, 0, 1][:, None, None]
+        m10 = mats[:, 1, 0][:, None, None]
+        m11 = mats[:, 1, 1][:, None, None]
+    out = np.empty_like(s)
+    out[:, :, 0, :] = m00 * a + m01 * b
+    out[:, :, 1, :] = m10 * a + m11 * b
+    return out.reshape(batch, 1 << n_qubits)
+
+
+def _ry_single(theta: float) -> np.ndarray:
+    """A single RY matrix, for parameters shared across the batch."""
+    c, s = np.cos(theta / 2.0), np.sin(theta / 2.0)
+    return np.array([[c, -s], [s, c]], dtype=complex)
+
+
+def _ry(theta: np.ndarray) -> np.ndarray:
+    """Batched RY matrices from an array of angles, shape (batch, 2, 2)."""
+    c = np.cos(theta / 2.0)
+    s = np.sin(theta / 2.0)
+    out = np.empty(theta.shape + (2, 2), dtype=complex)
+    out[..., 0, 0] = c
+    out[..., 0, 1] = -s
+    out[..., 1, 0] = s
+    out[..., 1, 1] = c
+    return out
+
+
+def _cz_ring_phases(n_qubits: int) -> np.ndarray:
+    """Diagonal of a ring of CZ gates: -1 wherever a neighbouring pair is |11>."""
+    bits = _bit_table(n_qubits).astype(int)
+    sign = np.ones(1 << n_qubits)
+    pairs = [(q, (q + 1) % n_qubits) for q in range(n_qubits)]
+    if n_qubits == 2:
+        pairs = [(0, 1)]
+    for i, j in pairs:
+        sign *= np.where((bits[:, i] == 1) & (bits[:, j] == 1), -1.0, 1.0)
+    return sign
+
+
+def _z_signs(n_qubits: int) -> np.ndarray:
+    """(n_qubits, 2^n) table of <Z_q> signs per basis state."""
+    bits = _bit_table(n_qubits)
+    return np.stack([1.0 - 2.0 * bits[:, q] for q in range(n_qubits)])
+
+
+class DataReuploadingQNN:
+    """
+    A quantum neural network in the data re-uploading style.
+
+    Each layer feeds the input in again through trainable rotations, so a
+    single qubit register can build up a non-linear decision function without
+    the depth a one-shot encoding would need (Pérez-Salinas et al., 2020).
+    That is architecturally different from the QSVM, which measures fixed-state
+    overlaps, and from the VQC, which encodes once and then varies.
+
+    Per layer, and per qubit:  RY(w·x + b) -> CZ ring -> RY(theta)
+    Readout: <Z_q> on every qubit, combined by a trained linear head.
+
+    Like the rest of this module it runs as batched statevector algebra, so a
+    training step costs a handful of small matrix products rather than one
+    circuit execution per sample.
+    """
+
+    def __init__(self, n_qubits: int = 6, layers: int = 3, seed: int = 42):
+        self.n_qubits = n_qubits
+        self.layers = layers
+        self.seed = seed
+        self.theta_: np.ndarray | None = None
+        self._cz = _cz_ring_phases(n_qubits)
+        self._z = _z_signs(n_qubits)
+        self.loss_history_: list[float] = []
+
+    @property
+    def n_params(self) -> int:
+        # per layer: w, b, theta for each qubit; plus a linear head
+        return self.layers * 3 * self.n_qubits + self.n_qubits + 1
+
+    def _unpack(self, p: np.ndarray):
+        n, L = self.n_qubits, self.layers
+        k = L * n
+        w = p[:k].reshape(L, n)
+        b = p[k:2 * k].reshape(L, n)
+        t = p[2 * k:3 * k].reshape(L, n)
+        head = p[3 * k:3 * k + n]
+        bias = p[-1]
+        return w, b, t, head, bias
+
+    def _forward(self, X: np.ndarray, p: np.ndarray) -> np.ndarray:
+        w, b, t, head, bias = self._unpack(p)
+        batch = X.shape[0]
+        state = np.zeros((batch, 1 << self.n_qubits), dtype=complex)
+        state[:, 0] = 1.0
+
+        for l in range(self.layers):
+            for q in range(self.n_qubits):
+                angles = w[l, q] * X[:, q] + b[l, q]
+                state = _apply_1q(state, _ry(angles), q, self.n_qubits)
+            state = state * self._cz
+            for q in range(self.n_qubits):
+                state = _apply_1q(state, _ry_single(t[l, q]), q, self.n_qubits)
+
+        probs = np.abs(state) ** 2                  # (batch, 2^n)
+        z = probs @ self._z.T                       # (batch, n_qubits)
+        return z @ head + bias
+
+    def fit(self, X: np.ndarray, y: np.ndarray, maxiter: int = 400,
+            max_samples: int = 2000, verbose: bool = False) -> "DataReuploadingQNN":
+        """
+        Fit by SPSA.
+
+        Simultaneous Perturbation Stochastic Approximation costs two objective
+        evaluations per step regardless of how many parameters there are, where
+        a finite-difference gradient costs one per parameter. With 60-80
+        parameters that is a thirty-fold saving, and SPSA is the optimiser
+        variational circuits actually use on hardware, where every evaluation
+        is a real circuit execution.
+        """
+        rng = np.random.default_rng(self.seed)
+        if len(X) > max_samples:
+            idx = rng.choice(len(X), max_samples, replace=False)
+            X, y = X[idx], y[idx]
+        X = np.asarray(X, float)[:, :self.n_qubits]
+        y = np.asarray(y, float)
+
+        theta = rng.normal(0.0, 0.4, size=self.n_params)
+        theta[:self.layers * self.n_qubits] = 1.0   # start with identity scaling
+
+        def loss(p: np.ndarray) -> float:
+            logits = self._forward(X, p)
+            # numerically stable binary cross-entropy
+            return float(np.mean(np.logaddexp(0.0, logits) - y * logits))
+
+        # Spall's recommended decay schedule.
+        a, c, A = 3.0, 0.10, max(1.0, 0.1 * maxiter)
+        alpha, gamma = 0.602, 0.101
+        best, best_loss = theta.copy(), loss(theta)
+        self.loss_history_ = [best_loss]
+
+        for k in range(maxiter):
+            ak = a / (k + 1 + A) ** alpha
+            ck = c / (k + 1) ** gamma
+            delta = rng.choice([-1.0, 1.0], size=self.n_params)
+            lp = loss(theta + ck * delta)
+            lm = loss(theta - ck * delta)
+            theta = theta - ak * (lp - lm) / (2.0 * ck) * delta
+            cur = 0.5 * (lp + lm)
+            self.loss_history_.append(cur)
+            if cur < best_loss:
+                best_loss, best = cur, theta.copy()
+
+        self.theta_ = best
+        if verbose:
+            print(f"    QNN: loss {self.loss_history_[0]:.4f} -> {best_loss:.4f} "
+                  f"over {maxiter} SPSA steps ({self.n_params} parameters, "
+                  f"{2 * maxiter + 1} circuit evaluations)")
+        return self
+
+    def decision(self, X: np.ndarray) -> np.ndarray:
+        return self._forward(np.asarray(X, float)[:, :self.n_qubits], self.theta_)
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        p1 = 1.0 / (1.0 + np.exp(-self.decision(X)))
+        return np.stack([1 - p1, p1], axis=1)
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return (self.predict_proba(X)[:, 1] > 0.5).astype(int)
+
+
+def verify_1q_against_qiskit(n_qubits: int = 4, seed: int = 0) -> float:
+    """Check `_apply_1q` and the CZ ring against Qiskit's simulator."""
+    from qiskit import QuantumCircuit
+    from qiskit.quantum_info import Statevector
+
+    rng = np.random.default_rng(seed)
+    angles = rng.uniform(-np.pi, np.pi, size=n_qubits)
+
+    qc = QuantumCircuit(n_qubits)
+    for q in range(n_qubits):
+        qc.ry(float(angles[q]), q)
+    for q in range(n_qubits):
+        qc.cz(q, (q + 1) % n_qubits)
+    ref = Statevector.from_instruction(qc).data
+
+    state = np.zeros((1, 1 << n_qubits), dtype=complex)
+    state[0, 0] = 1.0
+    for q in range(n_qubits):
+        state = _apply_1q(state, _ry(np.array([angles[q]])), q, n_qubits)
+    state = state * _cz_ring_phases(n_qubits)
+    return float(np.abs(np.abs(ref) ** 2 - np.abs(state[0]) ** 2).max())

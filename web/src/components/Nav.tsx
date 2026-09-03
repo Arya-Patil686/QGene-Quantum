@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 const LINKS = [
-  { to: '/predict', label: 'Predict' },
-  { to: '/resolver', label: 'VUS Resolver' },
-  { to: '/dashboard', label: 'Results' },
+  { to: '/platform', label: 'Platform' },
+  { to: '/detect', label: 'Detect' },
+  { to: '/studio', label: 'Studio' },
+  { to: '/genomics', label: 'Genomics' },
   { to: '/method', label: 'Method' },
 ];
 
@@ -86,7 +87,7 @@ export default function Nav() {
       )}
 
       <style>{`
-        @media (max-width: 820px) {
+        @media (max-width: 980px) {
           .nav-desktop { display: none !important; }
           .nav-toggle { display: inline-flex !important; }
         }

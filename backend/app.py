@@ -12,7 +12,10 @@ import pandas as pd
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
+import pandas as pd
+
 from core import QGene
+from platform_core import Platform
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "web" / "dist"
@@ -24,16 +27,23 @@ DATA = ROOT / "backend" / "data"
 app = Flask(__name__, static_folder=None)
 CORS(app)
 
-print("loading model bundle ...")
+print("loading model bundles ...")
 _t0 = time.time()
+PLATFORM = Platform()
+print(f"  {len(PLATFORM.pipelines)} dataset pipelines: "
+      f"{', '.join(PLATFORM.pipelines)}")
 MODEL = QGene()
 # Build the SHAP explainer up front; otherwise the first request pays for it.
 MODEL.predict({"name": "NM_007294.4(BRCA1):c.181T>G (p.Cys61Gly)"})
 print(f"ready in {time.time() - _t0:.1f}s")
 
 _METRICS = json.loads((DATA / "metrics.json").read_text())
+_PLATFORM = json.loads((DATA / "platform.json").read_text())
 _VUS = json.loads((DATA / "vus_scored.json").read_text()) if (DATA / "vus_scored.json").exists() else {"variants": []}
 _EXAMPLES = json.loads((DATA / "examples.json").read_text()) if (DATA / "examples.json").exists() else []
+
+# Uploaded tables live in memory only, for the duration of the process.
+_UPLOADS: dict[str, "pd.DataFrame"] = {}
 
 
 @app.get("/api/health")
@@ -110,6 +120,102 @@ def batch():
         except Exception as exc:                    # noqa: BLE001
             rows.append({"row": i + 1, "name": raw, "error": str(exc)[:120]})
     return jsonify({"total": len(rows), "results": rows})
+
+
+# ---------------------------------------------------------------------------
+# platform: many diseases, one pipeline
+# ---------------------------------------------------------------------------
+
+@app.get("/api/platform")
+def platform_overview():
+    """Catalogue and headline benchmark for every bundled dataset."""
+    slim = {
+        "generated": _PLATFORM["generated"],
+        "order": _PLATFORM["order"],
+        "catalogue": _PLATFORM["catalogue"],
+        "comparison": _PLATFORM["comparison"],
+    }
+    return jsonify(slim)
+
+
+@app.get("/api/platform/<dataset_id>")
+def platform_dataset(dataset_id: str):
+    rec = _PLATFORM["datasets"].get(dataset_id)
+    if rec is None:
+        return jsonify({"error": f"unknown dataset {dataset_id}"}), 404
+    return jsonify(rec)
+
+
+@app.get("/api/platform/<dataset_id>/schema")
+def platform_schema(dataset_id: str):
+    try:
+        return jsonify(PLATFORM.get(dataset_id).schema())
+    except KeyError:
+        return jsonify({"error": f"unknown dataset {dataset_id}"}), 404
+
+
+@app.post("/api/platform/<dataset_id>/predict")
+def platform_predict(dataset_id: str):
+    try:
+        pipe = PLATFORM.get(dataset_id)
+    except KeyError:
+        return jsonify({"error": f"unknown dataset {dataset_id}"}), 404
+    body = request.get_json(silent=True) or {}
+    threshold = float(body.get("threshold", 0.5))
+    try:
+        return jsonify(pipe.predict(body.get("values", {}), threshold=threshold,
+                                    explain=body.get("explain", True)))
+    except Exception as exc:                               # noqa: BLE001
+        return jsonify({"error": f"could not score that row: {exc}"}), 400
+
+
+# ---------------------------------------------------------------------------
+# studio: upload a dataset and train the same stack on it
+# ---------------------------------------------------------------------------
+
+def _read_upload(file_storage) -> pd.DataFrame:
+    raw = file_storage.read()
+    if len(raw) > 8 * 1024 * 1024:
+        raise ValueError("file is larger than 8 MB")
+    return pd.read_csv(io.BytesIO(raw))
+
+
+@app.post("/api/studio/profile")
+def studio_profile():
+    """Inspect an uploaded table: columns, missingness, candidate targets."""
+    if "file" not in request.files:
+        return jsonify({"error": "attach a CSV under the 'file' field"}), 400
+    try:
+        df = _read_upload(request.files["file"])
+    except Exception as exc:                               # noqa: BLE001
+        return jsonify({"error": f"could not read the CSV: {exc}"}), 400
+    if len(df) > 20000:
+        df = df.sample(20000, random_state=0)
+    _UPLOADS[request.form.get("id", "last")] = df
+    profile = PLATFORM.profile(df)
+    profile["id"] = request.form.get("id", "last")
+    return jsonify(profile)
+
+
+@app.post("/api/studio/train")
+def studio_train():
+    """Run the full hybrid pipeline on the uploaded table."""
+    body = request.get_json(silent=True) or {}
+    key = body.get("id", "last")
+    df = _UPLOADS.get(key)
+    if df is None:
+        return jsonify({"error": "upload a file first"}), 400
+    target = body.get("target")
+    if not target:
+        return jsonify({"error": "choose a target column"}), 400
+    try:
+        result = PLATFORM.train_uploaded(
+            df, target=target,
+            name=body.get("name", "Uploaded dataset"),
+            n_qubits=int(body.get("n_qubits", 6)))
+    except Exception as exc:                               # noqa: BLE001
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(result)
 
 
 @app.get("/")

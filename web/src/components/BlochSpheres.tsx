@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { BlochVector } from '../lib/api';
 import { reducedMotion } from '../lib/motion';
@@ -14,7 +14,6 @@ import { reducedMotion } from '../lib/motion';
  * at runtime) and no fat lines. Labels are HTML underneath, which keeps them
  * crisp and selectable.
  */
-const SPACING = 2.6;
 
 function ringGeometry(axis: 'x' | 'y' | 'z') {
   const pts: THREE.Vector3[] = [];
@@ -87,10 +86,31 @@ function Sphere({ v, offset, still }: { v: BlochVector; offset: number; still: b
   );
 }
 
+/**
+ * Lay the spheres out across the full width of the canvas so each one sits
+ * above its label, whatever the qubit count. The viewport width is only known
+ * inside the Canvas, hence the inner component.
+ */
+function Row({ vectors, still }: { vectors: BlochVector[]; still: boolean }) {
+  const { viewport } = useThree();
+  const n = vectors.length;
+  const cell = viewport.width / n;
+  const scale = Math.min(1, (cell * 0.82) / 2);   // 2 world units per sphere
+  return (
+    <>
+      {vectors.map((v, i) => (
+        <group key={v.qubit} scale={scale}>
+          <Sphere v={v} still={still}
+                  offset={(i - (n - 1) / 2) * (cell / scale)} />
+        </group>
+      ))}
+    </>
+  );
+}
+
 export default function BlochSpheres({ vectors }: { vectors: BlochVector[] }) {
   const still = reducedMotion();
   const shown = vectors.slice(0, 8);
-  const span = (shown.length - 1) * SPACING;
 
   return (
     <div>
@@ -101,10 +121,7 @@ export default function BlochSpheres({ vectors }: { vectors: BlochVector[] }) {
         <Canvas orthographic camera={{ position: [0, 0, 12], zoom: 46 }}
                 gl={{ alpha: true, antialias: true }} dpr={[1, 1.6]}>
           <ambientLight intensity={1.2} />
-          {shown.map((v, i) => (
-            <Sphere key={v.qubit} v={v} still={still}
-                    offset={i * SPACING - span / 2} />
-          ))}
+          <Row vectors={shown} still={still} />
         </Canvas>
       </div>
       <div style={{ display: 'grid', gap: 6,

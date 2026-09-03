@@ -1,11 +1,11 @@
-# QGene — quantum–classical variant intelligence for BRCA1 and BRCA2
+# QGene — a hybrid quantum machine learning platform for early disease detection
 
-Predicts whether a BRCA1 or BRCA2 variant is pathogenic or benign using a hybrid
-of classical and quantum machine learning — and, unusually for a predictor,
-reports when it should not be trusted.
+**Smart India Hackathon 2026 · Problem Statement 26139 · MedTech / BioTech / HealthTech**
+Team *Bugs Janta Party* (800C4B)
 
-Built for **FF No. 180**, Department of Computer Engineering, Vishwakarma
-Institute of Technology, Pune.
+One hybrid quantum–classical pipeline — cleaning, imputation, feature selection,
+PCA, quantum encoding, six models and a calibrated ensemble — applied unchanged
+across **five diseases in four clinical domains**, plus any dataset you upload.
 
 ![status](https://img.shields.io/badge/status-research%20prototype-7c5cff)
 ![python](https://img.shields.io/badge/python-3.12-blue)
@@ -13,92 +13,89 @@ Institute of Technology, Pune.
 
 ---
 
-## What it does
+## What it is
 
-| | |
-|---|---|
-| **Classifies** | BRCA1/BRCA2 variants as pathogenic or benign from the HGVS description alone |
-| **Explains** | SHAP contributions, the molecular consequence, and the functional domain the residue sits in |
-| **Shows its quantum working** | the actual ZZFeatureMap circuit for your variant, its Bloch vectors, measurement distribution and nearest neighbours in kernel space |
-| **Knows when to stop** | conformal prediction returns a set with a coverage guarantee, and returns *both* labels rather than guessing |
-| **Resolves the unresolved** | every ClinVar BRCA variant currently marked uncertain or conflicting, scored and ranked for reclassification priority |
+Not a single-disease classifier. The pipeline in [`ml/pipeline.py`](ml/pipeline.py)
+never learns which disease it is looking at, so the same code path serves:
 
-## The four contributions
+| Disease | Domain | Modality | n | Features |
+|---|---|---|---|---|
+| Hereditary breast & ovarian cancer | cancer | genomics | 20,296 | 22 |
+| Breast cancer | cancer | imaging-derived | 569 | 30 |
+| Coronary artery disease | cardiovascular | clinical records | 303 | 13 |
+| Parkinson's disease | neurological | voice signal | 195 | 22 |
+| Type 2 diabetes | metabolic | clinical records | 768 | 8 |
+| **Your CSV** | — | tabular | — | — |
 
-**1 · An evaluation that holds up.** ClinVar lists every variant once per genome
-assembly, so a row-level train/test split places the same variant on both sides.
-The original pipeline did exactly that. Reproducing the mistake here and then
-fixing it isolates how much of the reported accuracy was memorisation — the
-number is in [`docs/RESULTS.md`](docs/RESULTS.md). Every figure in this project
-uses a variant-level split.
+Full numbers: [`docs/PLATFORM.md`](docs/PLATFORM.md).
 
-**2 · Quantum kernels in closed form.** Qiskit's `FidelityQuantumKernel`
-evaluates one circuit per *pair* of samples: O(n²) simulations, which is why the
-original QSVM was limited to 500 training samples and needed seconds per
-request. Under statevector simulation the kernel is exactly
+## Against the problem statement's delivery table
 
-```
-K(x, y) = |⟨φ(x)|φ(y)⟩|²
-```
-
-so states are prepared once — O(n) — and the Gram matrix is a single product.
-The ZZFeatureMap is also written analytically (after the Hadamard layer each
-repetition is diagonal), vectorised across the batch. The implementation is
-checked against Qiskit's own simulator on every training run and agrees to
-machine precision. Consequences: the QSVM trains on thousands of samples rather
-than hundreds, the VQC trains on the *full* training set rather than 200
-samples, and the whole quantum path — state preparation, the kernel row
-against 4,000 training states, QSVM and VQC — costs about **2 ms** per
-prediction, so the classical Random Forest is now the slower half of the
-ensemble.
-
-**3 · A model that can abstain.** Class-conditional split conformal prediction
-turns the ensemble probability into a prediction set with a distribution-free
-coverage guarantee, and reports a per-class conformal p-value rather than only a
-binary set. Targeting 90% coverage it declines to commit on roughly 9% of test
-variants and is 99.7% accurate on the rest.
-
-The gap between the classical and quantum sub-ensembles is also recorded as an
-epistemic signal. Reported honestly: it is a *weak* error detector on this
-dataset (AUC ≈ 0.61) and the plain confidence margin is far better (≈ 0.96), so
-disagreement is surfaced as a secondary flag rather than sold as the main
-uncertainty measure. See [`docs/RESULTS.md`](docs/RESULTS.md).
-
-**4 · The VUS Resolver.** A variant of uncertain significance is a finding in a
-patient's report with no interpretation attached. These rows carry no label, so
-predictors normally discard them. QGene keeps them, scores every one, and ranks
-them by how much resolving each would be worth — confident calls where the
-classical and quantum branches agree come first.
-
-## A note on the headline accuracy
-
-The hybrid ensemble reaches ~98% accuracy on the held-out test set, which is
-higher than the BRCA literature would suggest. That is a property of the
-*labelled* subset, not a sign of a strong model, and the repository measures it
-rather than glossing over it:
-
-| Consequence class | share of test set | accuracy |
+| # | Deliverable | Where |
 |---|---|---|
-| truncating (frameshift / stop-gained) | ~39% | ~99.9% |
-| synonymous | ~26% | ~99.9% |
-| splice site | ~2% | 100% |
-| intronic | ~17% | ~95% |
-| **missense** | **~8%** | **~86%** |
+| 1 | Pre-processing & feature engineering — cleaning, normalisation, dimensionality reduction, feature selection, missing/noisy data | [`ml/pipeline.py`](ml/pipeline.py) |
+| 2 | Hybrid quantum-classical architecture — classical front-end, quantum register, data encoding | [`ml/pipeline.py`](ml/pipeline.py), [`ml/quantum.py`](ml/quantum.py) |
+| 3 | Quantum ML models — QSVM, VQC, QNN, parameterised circuits | [`ml/quantum.py`](ml/quantum.py) |
+| 4 | Prediction & decision support — probability, risk stratification, threshold tuning for sensitivity/specificity | [`backend/platform_core.py`](backend/platform_core.py) |
+| 5 | Software platform — API, dataset upload, training & evaluation dashboard, result visualisation | [`backend/app.py`](backend/app.py), [`web/`](web) |
 
-Almost every ClinVar BRCA record labelled pathogenic is truncating, and almost
-every record labelled benign is synonymous or deep intronic — so most of the
-test set is separable on consequence alone. The genuinely hard class is
-missense, where accuracy drops to ~86%.
+## Four things this build contributes
 
-And the hardest missense variants are not in the labelled set at all: they are
-the ones ClinVar still calls uncertain. That is precisely the population the VUS
-Resolver targets, and it is why per-class numbers are reported alongside the
-headline.
+**1 · It tells you when quantum *won't* help — before you train.**
+The platform sweeps the ZZFeatureMap kernel across register widths and measures
+kernel-target alignment and off-diagonal spread. On every dataset here the
+spread roughly **halves with each qubit added** (0.264 → 0.006 on WDBC across
+2→8 qubits): exponential concentration, the kernel matrix tending to the
+identity. It is the direct explanation for the QSVM's collapsed sensitivity, and
+it is reported up front rather than discovered afterwards.
+
+**2 · Quantum kernels in closed form.**
+Qiskit's `FidelityQuantumKernel` runs one circuit per *pair* of samples — O(n²).
+Under statevector simulation the kernel is exactly
+
+```
+K(x, y) = |⟨φ(x)|φ(y)⟩|²        →        K = |Ψ Ψ†|²
+```
+
+so states are prepared once, O(n), and the Gram matrix is one product. The
+ZZFeatureMap and the QNN's gate applications are written analytically and
+verified against Qiskit's simulator on every run (agreement ~1e-15, exact for
+the QNN path). This is what makes the diagnostic sweep and browser-speed
+training possible: a 4000×4000 quantum Gram matrix builds in about a second.
+
+**3 · Three genuinely different quantum models.**
+A quantum-kernel SVM, a variational classifier (RealAmplitudes, COBYLA), and a
+**data re-uploading QNN** trained by **SPSA** — two objective evaluations per
+step regardless of parameter count, which is the optimiser variational circuits
+actually use on hardware. The QNN is the strongest quantum model and beats every
+classical baseline on two of the five datasets.
+
+**4 · Decision support, not just a score.**
+A five-band risk ladder validated against the observed outcome rate in each
+band; a full sensitivity/specificity sweep with screening and confirmation
+presets; and class-conditional conformal prediction that abstains rather than
+guessing — and says so when the calibration set is too small for the guarantee
+to be tight.
+
+## Honest results
+
+The quantum branch wins on **2 of 5** datasets. It loses on the other three, the
+ensemble down-weights it automatically, and all of that is on the dashboard.
+Quantum–classical disagreement was tested as an uncertainty signal on the
+genomics dataset and is *worse* than the plain confidence margin (AUC 0.61
+against 0.96), so it is surfaced as a secondary flag rather than sold as the
+uncertainty measure.
+
+The genomics dataset also carries a methodological correction: ClinVar lists
+every variant once per genome assembly, so a row-level split leaks the same
+variant into train and test. Reproducing that mistake inflates accuracy by
+**1.03 points** across 6,277 shared variants. Details in
+[`docs/RESULTS.md`](docs/RESULTS.md).
 
 ## Quick start
 
-The trained model bundle and every result artefact are committed, so the app
-runs without retraining:
+Every trained model and result artefact is committed, so the app runs without
+retraining:
 
 ```bash
 make setup     # virtualenv + npm install
@@ -106,94 +103,67 @@ make web       # build the front end
 make serve     # http://localhost:5001
 ```
 
-To rebuild everything from the source data instead:
+Rebuild everything from source data instead:
 
 ```bash
-make all       # download ClinVar, build dataset, train, score VUS, build the UI
+make data          # ClinVar download + genomics dataset build
+make platform      # train all five datasets
+make report        # regenerate docs/
 ```
-
-The full pipeline takes about four minutes, most of it the ClinVar download.
-
-Or step by step:
-
-```bash
-./scripts/fetch_clinvar.sh     # parallel, resumable download of variant_summary
-.venv/bin/python ml/build_dataset.py
-.venv/bin/python ml/train.py
-.venv/bin/python ml/score_vus.py
-cd web && npm run build
-.venv/bin/python backend/app.py
-```
-
-Front-end development with hot reload (`npm run dev` on :5173, API on :5001):
-
-```bash
-make serve &
-make dev
-```
-
-## Deployment
-
-The repository ships a two-stage `Dockerfile` — Node builds the front end, and
-the runtime image carries only Python and the built assets:
-
-```bash
-docker build -t qgene .
-docker run -p 8000:8000 qgene
-```
-
-`render.yaml` points at that Dockerfile, so a Render deploy needs no extra
-configuration. The trained bundle is committed, so no build-time training step
-is required.
 
 ## Layout
 
 ```
 ml/
-  features.py        molecular feature engineering — HGVS parsing, Grantham,
-                     hydropathy, functional domains
-  quantum.py         analytic ZZFeatureMap, closed-form fidelity kernel,
-                     batched-statevector VQC
-  build_dataset.py   assembly de-duplication, labelling, variant-level splits
-  train.py           four models, ensemble, conformal calibration, evaluation,
-                     the leakage demonstration
-  score_vus.py       scores and ranks every unresolved variant
+  datasets.py        the bundled dataset registry, one loader per disease
+  pipeline.py        the dataset-agnostic hybrid pipeline + kernel diagnostics
+  quantum.py         analytic ZZFeatureMap, closed-form kernel, VQC, QNN
+  features.py        genomics feature engineering (HGVS, Grantham, domains)
+  build_dataset.py   ClinVar de-duplication and variant-level splits
+  train_platform.py  trains every bundled dataset
+  train.py           the genomics deep-dive (leakage demo, stratified eval)
+  score_vus.py       ranks ClinVar's unresolved variants
 backend/
-  core.py            inference: probabilities, conformal sets, SHAP, quantum
-                     introspection
-  app.py             Flask API + static host
-web/                 React + Vite + React Three Fiber front end
-scripts/
-  fetch_clinvar.sh   parallel ranged download
-  make_report.py     regenerates docs/RESULTS.md from metrics.json
-docs/RESULTS.md      the comparative analysis report
+  pipeline serving, the studio's upload-and-train path, Flask API
+web/                 React + React Three Fiber front end
+docs/
+  PLATFORM.md        cross-dataset benchmark
+  RESULTS.md         genomics deep-dive
+  ARCHITECTURE.md    how the pieces fit
 ```
 
 ## API
 
 | Endpoint | |
 |---|---|
-| `POST /api/predict` | `{"name": "NM_007294.4(BRCA1):c.181T>G (p.Cys61Gly)"}` → full result |
-| `POST /api/batch` | CSV upload with a `name` column, up to 500 rows |
-| `GET /api/vus` | ranked unresolved variants |
-| `GET /api/metrics` | every number behind the results dashboard |
-| `GET /api/examples` | curated demonstration variants |
+| `GET /api/platform` | dataset catalogue and headline benchmark |
+| `GET /api/platform/<id>` | one dataset's full record |
+| `GET /api/platform/<id>/schema` | feature list for building an input form |
+| `POST /api/platform/<id>/predict` | probability, risk tier, conformal set, SHAP, quantum state |
+| `POST /api/studio/profile` | inspect an uploaded CSV |
+| `POST /api/studio/train` | train the whole stack on it |
+| `POST /api/predict` | genomics: score an HGVS variant |
+| `GET /api/vus` | genomics: ranked unresolved variants |
+
+## Deployment
+
+Two-stage `Dockerfile` — Node builds the front end, the runtime image carries
+only Python and the built assets.
+
+```bash
+docker build -t qgene . && docker run -p 8000:8000 qgene
+```
 
 ## Credit
 
-QGene began as a project by **Ananya Choudhari** — the original hybrid
-classifier, ClinVar pipeline, SHAP layer and first web application live at
-[ananyac9820/QGene](https://github.com/ananyac9820/QGene). This repository keeps
-that structure and extends it with a rebuilt leak-free dataset, molecular
-feature engineering, the closed-form quantum kernel, conformal abstention, the
-VUS Resolver and a new interface.
-
-Group 16 — Ananya Choudhari, Arya Bharat Patil, Aryan Bhat, Ankush Kumar.
-Internal guide: Prof. Shilpa Katikar.
+The BRCA genomics component began as a project by **Ananya Choudhari** —
+original hybrid classifier, ClinVar pipeline, SHAP layer and first web app at
+[ananyac9820/QGene](https://github.com/ananyac9820/QGene). This repository
+generalises that into a dataset-agnostic platform and adds the pre-processing
+pipeline, the QNN, kernel diagnostics, conformal abstention, decision support
+and the studio.
 
 ## Disclaimer
 
-QGene is an academic research prototype. Its predictions are generated by
-machine learning models, have not been clinically validated, and must never form
-the basis of a medical decision. Consult a qualified clinician or genetic
-counsellor.
+A research prototype built on public benchmark datasets. Predictions are not
+clinically validated and must never form the basis of a medical decision.

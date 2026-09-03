@@ -5,7 +5,10 @@ import Footer from './components/Footer';
 import { useSmoothScroll } from './lib/motion';
 
 const Landing = lazy(() => import('./pages/Landing'));
-const Predict = lazy(() => import('./pages/Predict'));
+const Platform = lazy(() => import('./pages/Platform'));
+const Detect = lazy(() => import('./pages/Detect'));
+const Studio = lazy(() => import('./pages/Studio'));
+const Genomics = lazy(() => import('./pages/Predict'));
 const Resolver = lazy(() => import('./pages/Resolver'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Method = lazy(() => import('./pages/Method'));
@@ -32,7 +35,11 @@ export default function App() {
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route path="/" element={<Landing />} />
-            <Route path="/predict" element={<Predict />} />
+            <Route path="/platform" element={<Platform />} />
+            <Route path="/detect" element={<Detect />} />
+            <Route path="/studio" element={<Studio />} />
+            <Route path="/genomics" element={<Genomics />} />
+            <Route path="/predict" element={<Genomics />} />
             <Route path="/resolver" element={<Resolver />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/method" element={<Method />} />

@@ -1,0 +1,313 @@
+{
+ "comparison": [
+  {
+   "label": "BRCA\n(genomics)",
+   "classical": 99.76,
+   "quantum": 99.01,
+   "hybrid": 99.77,
+   "wins": false
+  },
+  {
+   "label": "Breast\n(imaging)",
+   "classical": 99.64,
+   "quantum": 99.77,
+   "hybrid": 99.6,
+   "wins": true
+  },
+  {
+   "label": "Heart\n(records)",
+   "classical": 92.75,
+   "quantum": 94.91,
+   "hybrid": 92.86,
+   "wins": true
+  },
+  {
+   "label": "Parkinson's\n(voice)",
+   "classical": 91.72,
+   "quantum": 87.93,
+   "hybrid": 88.62,
+   "wins": false
+  },
+  {
+   "label": "Diabetes\n(records)",
+   "classical": 79.41,
+   "quantum": 76.22,
+   "hybrid": 79.58,
+   "wins": false
+  }
+ ],
+ "catalogue": [
+  {
+   "disease": "Hereditary breast and ovarian cancer",
+   "domain": "cancer",
+   "modality": "genomics",
+   "n": 20296,
+   "f": 22,
+   "missing": 0.0
+  },
+  {
+   "disease": "Breast cancer",
+   "domain": "cancer",
+   "modality": "imaging-derived",
+   "n": 569,
+   "f": 30,
+   "missing": 0.0
+  },
+  {
+   "disease": "Coronary artery disease",
+   "domain": "cardiovascular",
+   "modality": "clinical records",
+   "n": 303,
+   "f": 13,
+   "missing": 0.2
+  },
+  {
+   "disease": "Parkinson's disease",
+   "domain": "neurological",
+   "modality": "voice signal",
+   "n": 195,
+   "f": 22,
+   "missing": 0.0
+  },
+  {
+   "disease": "Type 2 diabetes",
+   "domain": "metabolic",
+   "modality": "clinical records",
+   "n": 768,
+   "f": 8,
+   "missing": 10.6
+  }
+ ],
+ "concentration": [
+  {
+   "qubits": 2,
+   "alignment": 0.1608,
+   "off_diagonal_mean": 0.36069,
+   "off_diagonal_std": 0.26383,
+   "variance_retained": 0.6469
+  },
+  {
+   "qubits": 3,
+   "alignment": 0.1178,
+   "off_diagonal_mean": 0.14983,
+   "off_diagonal_std": 0.14378,
+   "variance_retained": 0.7432
+  },
+  {
+   "qubits": 4,
+   "alignment": 0.1046,
+   "off_diagonal_mean": 0.07321,
+   "off_diagonal_std": 0.07371,
+   "variance_retained": 0.8089
+  },
+  {
+   "qubits": 5,
+   "alignment": 0.085,
+   "off_diagonal_mean": 0.03743,
+   "off_diagonal_std": 0.03818,
+   "variance_retained": 0.8579
+  },
+  {
+   "qubits": 6,
+   "alignment": 0.0802,
+   "off_diagonal_mean": 0.01907,
+   "off_diagonal_std": 0.01952,
+   "variance_retained": 0.899
+  },
+  {
+   "qubits": 7,
+   "alignment": 0.0664,
+   "off_diagonal_mean": 0.01008,
+   "off_diagonal_std": 0.01029,
+   "variance_retained": 0.9186
+  },
+  {
+   "qubits": 8,
+   "alignment": 0.0631,
+   "off_diagonal_mean": 0.00562,
+   "off_diagonal_std": 0.00569,
+   "variance_retained": 0.9335
+  }
+ ],
+ "wdbc_models": {
+  "logistic_regression": {
+   "auc": 99.44,
+   "sens": 92.9,
+   "spec": 98.6,
+   "family": "classical"
+  },
+  "random_forest": {
+   "auc": 99.64,
+   "sens": 95.2,
+   "spec": 98.6,
+   "family": "classical"
+  },
+  "svm": {
+   "auc": 99.64,
+   "sens": 97.6,
+   "spec": 100.0,
+   "family": "classical"
+  },
+  "qsvm": {
+   "auc": 74.93,
+   "sens": 50.0,
+   "spec": 77.8,
+   "family": "quantum"
+  },
+  "vqc": {
+   "auc": 66.3,
+   "sens": 31.0,
+   "spec": 83.3,
+   "family": "quantum"
+  },
+  "qnn": {
+   "auc": 99.77,
+   "sens": 90.5,
+   "spec": 100.0,
+   "family": "quantum"
+  },
+  "hybrid": {
+   "auc": 99.6,
+   "sens": 97.6,
+   "spec": 100.0,
+   "family": "hybrid"
+  }
+ },
+ "heart_models": {
+  "logistic_regression": 92.75,
+  "random_forest": 92.1,
+  "svm": 87.88,
+  "qsvm": 75.32,
+  "vqc": 53.46,
+  "qnn": 94.91,
+  "hybrid": 92.86
+ },
+ "stages": [
+  "clean",
+  "impute",
+  "denoise",
+  "normalise",
+  "select",
+  "reduce",
+  "encode"
+ ],
+ "quantum": {
+  "n_qubits": 6,
+  "vqc_qubits": 4,
+  "qnn_layers": 3,
+  "qnn_qubits": 6,
+  "qnn_parameters": 61,
+  "feature_map": "ZZFeatureMap(reps=2, full entanglement)",
+  "vqc_ansatz": "RealAmplitudes(reps=3)",
+  "qnn_ansatz": "data re-uploading, 3 layers, CZ ring",
+  "pca_variance_retained": 0.8990368925668508,
+  "qsvm_train_samples": 341,
+  "gram_matrix_seconds": 0.003,
+  "gram_shape": [
+   341,
+   341
+  ],
+  "kernel_max_deviation_vs_qiskit": 6.036837696399289e-16
+ },
+ "risk_tiers": [
+  {
+   "tier": "Very low",
+   "lower": 0.0,
+   "upper": 0.1,
+   "n": 10,
+   "share": 0.1639,
+   "observed_positive_rate": 0.0
+  },
+  {
+   "tier": "Low",
+   "lower": 0.1,
+   "upper": 0.3,
+   "n": 15,
+   "share": 0.2459,
+   "observed_positive_rate": 0.1333
+  },
+  {
+   "tier": "Moderate",
+   "lower": 0.3,
+   "upper": 0.6,
+   "n": 15,
+   "share": 0.2459,
+   "observed_positive_rate": 0.4
+  },
+  {
+   "tier": "High",
+   "lower": 0.6,
+   "upper": 0.85,
+   "n": 11,
+   "share": 0.1803,
+   "observed_positive_rate": 1.0
+  },
+  {
+   "tier": "Very high",
+   "lower": 0.85,
+   "upper": 1.0,
+   "n": 10,
+   "share": 0.1639,
+   "observed_positive_rate": 0.9
+  }
+ ],
+ "conformal_brca": {
+  "target_coverage": 0.9,
+  "empirical_coverage": 0.9031834591401379,
+  "abstention_rate": 0.09419100754840826,
+  "accuracy_on_confident_calls": 0.9971014492753624
+ },
+ "leakage": {
+  "row_level_split_accuracy": 0.9934869739478958,
+  "variant_level_split_accuracy": 0.9832164328657315,
+  "inflation_points": 1.03,
+  "variants_shared_between_train_and_test": 6277,
+  "test_rows": 7984,
+  "note": "Both numbers use the same features, the same model and the same data. The only difference is whether the split respects variant identity."
+ },
+ "by_consequence": [
+  {
+   "consequence": "truncating",
+   "n": 1184,
+   "share_pathogenic": 0.9958,
+   "accuracy": 0.9992,
+   "roc_auc": 0.9813
+  },
+  {
+   "consequence": "missense",
+   "n": 238,
+   "share_pathogenic": 0.2101,
+   "accuracy": 0.8571,
+   "roc_auc": 0.9388
+  },
+  {
+   "consequence": "synonymous",
+   "n": 793,
+   "share_pathogenic": 0.0013,
+   "accuracy": 0.9987,
+   "roc_auc": 0.9949
+  },
+  {
+   "consequence": "splice site",
+   "n": 61,
+   "share_pathogenic": 1.0,
+   "accuracy": 1.0
+  },
+  {
+   "consequence": "intronic",
+   "n": 530,
+   "share_pathogenic": 0.1849,
+   "accuracy": 0.9472,
+   "roc_auc": 0.9593
+  },
+  {
+   "consequence": "other",
+   "n": 302,
+   "share_pathogenic": 0.9139,
+   "accuracy": 0.9967
+  }
+ ],
+ "total_samples": 22131,
+ "quantum_wins": 2,
+ "vus": 15581
+}

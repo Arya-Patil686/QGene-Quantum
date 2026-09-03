@@ -30,4 +30,4 @@ EXPOSE 8000
 
 # One worker: the model bundle is loaded per process and the SHAP explainer is
 # warmed at import, so extra workers multiply memory without helping much.
-CMD ["sh", "-c", "gunicorn --chdir backend app:app --bind 0.0.0.0:${PORT} --timeout 120 --workers 1"]
+CMD ["sh", "-c", "gunicorn --chdir backend app:app --bind 0.0.0.0:${PORT} --timeout 300 --workers 1"]
